@@ -1,8 +1,8 @@
 const speedometer = require('speedometer')
-const Events = require('bare-events')
+const { Readable } = require('bare-stream')
 const DriveAnalyzer = require('drive-analyzer')
 
-module.exports = class Prefetcher extends Events {
+module.exports = class Prefetcher extends Readable {
   constructor(drive, { interval = 250 } = {}) {
     super()
 
@@ -48,7 +48,7 @@ module.exports = class Prefetcher extends Events {
 
   update() {
     const mUploadedBytes = this.monitor ? this.monitor.stats.upload.bytes : 0
-    const mUploadedBlocks = this.monitor ? this.monitor.stats.upload.blocks: 0
+    const mUploadedBlocks = this.monitor ? this.monitor.stats.upload.blocks : 0
     const mDownloadedBytes = this.monitor ? this.monitor.stats.download.bytes : 0
     const mDownloadedBlocks = this.monitor ? this.monitor.stats.download.blocks : 0
     const mDownloadedBlocksEst = this.mirror ? this.mirror.downloadedBlocksEstimate : 0
@@ -56,7 +56,7 @@ module.exports = class Prefetcher extends Events {
 
     const blocks = mDownloadedBlocks + this._downloadedBlocks
     const est = mDownloadedBlocksEst + this._downloadedBlocksEstimate
-    const progress = this.finished ? 1 : (est === 0 ? 0 : Math.min(0.99, blocks / est))
+    const progress = this.finished ? 1 : est === 0 ? 0 : Math.min(0.99, blocks / est)
 
     this.stats = {
       peers: Math.max(mPeers, this.drive.db.core.peers.length),
@@ -69,24 +69,41 @@ module.exports = class Prefetcher extends Events {
       upload: {
         bytes: mUploadedBytes,
         blocks: mUploadedBlocks,
-        speed: this.mirror ? this.mirror.uploadSpeed() : this._uploadSpeed(),
+        speed: this.mirror ? this.mirror.uploadSpeed() : this._uploadSpeed()
       }
     }
 
     this.emit('update', this.stats)
   }
 
-  async start (mirror) {
+  async _mirror() {
+    for await (const diff of this.mirror) {
+      this.push(diff)
+    }
+  }
+
+  start(mirror) {
+    const started = this._start(mirror)
+    started.catch((err) => {
+      this.emit('error', err)
+    })
+    return started
+  }
+
+  async _start(mirror) {
     this.mirror = mirror
 
-    const [blobs, warmup] = await Promise.all([
-      this.drive.getBlobs(),
-      this.drive.db.get('warmup')
-    ])
+    if (this.mirror) {
+      this._mirror().catch((err) => this.emit('error', err))
+    }
+
+    const [blobs, warmup] = await Promise.all([this.drive.getBlobs(), this.drive.db.get('warmup')])
 
     if (this.mirror) {
       this.monitor = this.mirror.monitor()
-      if (!this.monitor.preloaded) await new Promise(resolve => this.monitor.on('preloaded', resolve))
+      if (!this.monitor.preloaded) {
+        await new Promise((resolve) => this.monitor.on('preloaded', resolve))
+      }
     }
 
     const ranges = DriveAnalyzer.decode(warmup.value.meta, warmup.value.data)

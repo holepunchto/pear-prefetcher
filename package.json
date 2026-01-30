@@ -6,18 +6,21 @@
     "index.js"
   ],
   "scripts": {
-    "test": "bare test/test.js",
-    "format": "prettier --write .",
-    "lint": "prettier --check ."
+    "format": "prettier --write . && lunte --fix",
+    "lint": "prettier --check . && lunte"
   },
   "keywords": [],
   "author": "",
   "license": "Apache-2.0",
   "dependencies": {
+    "bare-stream": "^2.7.0",
     "drive-analyzer": "^2.0.2"
   },
   "description": "Pear platform run prefetch monitoring",
   "devDependencies": {
-    "brittle": "^3.19.1"
+    "brittle": "^3.19.1",
+    "lunte": "^1.5.0",
+    "prettier": "^3.8.1",
+    "prettier-config-holepunch": "^2.0.0"
   }
 }
