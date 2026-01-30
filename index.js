@@ -172,6 +172,8 @@ module.exports = class Prefetcher extends Readable {
 
     this.finished = true
     this.update()
+
+    this.push(null)
   }
 }
 
