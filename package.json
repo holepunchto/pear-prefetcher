@@ -1,0 +1,23 @@
+{
+  "name": "prefetcher",
+  "version": "1.0.0",
+  "main": "index.js",
+  "files": [
+    "index.js"
+  ],
+  "scripts": {
+    "test": "bare test/test.js",
+    "format": "prettier --write .",
+    "lint": "prettier --check ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "drive-analyzer": "^2.0.2"
+  },
+  "description": "Pear platform run prefetch monitoring",
+  "devDependencies": {
+    "brittle": "^3.19.1"
+  }
+}
