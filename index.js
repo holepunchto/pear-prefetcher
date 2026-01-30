@@ -20,6 +20,11 @@ module.exports = class Prefetcher extends Readable {
     this._uploadedBytes = 0
     this._uploadSpeed = speedometer()
 
+    this._startedResolve = null
+    this._startedPromise = new Promise((resolve) => {
+      this._startedResolve = resolve
+    })
+
     this._interval = interval
     this._timer = null
 
@@ -28,6 +33,13 @@ module.exports = class Prefetcher extends Readable {
 
     this._ondownloadBound = this._ondownload.bind(this)
     this._onuploadBound = this._onupload.bind(this)
+  }
+
+  async *[Symbol.asyncIterator]() {
+    await this._startedPromise
+    if (!this.mirror) return
+    yield* this.mirror[Symbol.asyncIterator]()
+    await this.started
   }
 
   _onupload(index, byteLength) {
@@ -76,13 +88,13 @@ module.exports = class Prefetcher extends Readable {
     this.emit('update', this.stats)
   }
 
-  async _mirror() {
-    for await (const diff of this.mirror) {
-      this.push(diff)
-    }
+  start(mirror) {
+    if (this.started) return
+    this.started = this._start(mirror)
+    return this.started
   }
 
-  start(mirror) {
+  _start(mirror) {
     const started = this._start(mirror)
     started.catch((err) => {
       this.emit('error', err)
@@ -92,10 +104,6 @@ module.exports = class Prefetcher extends Readable {
 
   async _start(mirror) {
     this.mirror = mirror
-
-    if (this.mirror) {
-      this._mirror().catch((err) => this.emit('error', err))
-    }
 
     const [blobs, warmup] = await Promise.all([this.drive.getBlobs(), this.drive.db.get('warmup')])
 
@@ -172,8 +180,6 @@ module.exports = class Prefetcher extends Readable {
 
     this.finished = true
     this.update()
-
-    this.push(null)
   }
 }
 
