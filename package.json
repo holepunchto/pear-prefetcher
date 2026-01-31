@@ -1,5 +1,5 @@
 {
-  "name": "prefetcher",
+  "name": "pear-prefetcher",
   "version": "1.0.0",
   "main": "index.js",
   "files": [
