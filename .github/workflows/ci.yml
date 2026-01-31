@@ -1,0 +1,31 @@
+name: CI
+on:
+  schedule:
+    - cron: '0 10 * * *'
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  repository_dispatch:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Setup repo
+        uses: holepunchto/actions/.github/steps/setup-repo@v1
+
+      - name: Install w/ dev deps
+        run: npm install --ignore-scripts
+
+      - name: Lint
+        run: npm run lint

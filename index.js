@@ -1,6 +1,6 @@
 const speedometer = require('speedometer')
-const Events = require('bare-events')
 const DriveAnalyzer = require('drive-analyzer')
+const Events = require('bare-events')
 
 module.exports = class Prefetcher extends Events {
   constructor(drive, { interval = 250 } = {}) {
@@ -20,6 +20,11 @@ module.exports = class Prefetcher extends Events {
     this._uploadedBytes = 0
     this._uploadSpeed = speedometer()
 
+    this._startedResolve = null
+    this._startedPromise = new Promise((resolve) => {
+      this._startedResolve = resolve
+    })
+
     this._interval = interval
     this._timer = null
 
@@ -28,6 +33,17 @@ module.exports = class Prefetcher extends Events {
 
     this._ondownloadBound = this._ondownload.bind(this)
     this._onuploadBound = this._onupload.bind(this)
+  }
+
+  async *[Symbol.asyncIterator]() {
+    await this._startedPromise
+    if (!this.mirror) {
+      await this.started
+      return
+    }
+
+    yield* this.mirror[Symbol.asyncIterator]()
+    await this.started
   }
 
   _onupload(index, byteLength) {
@@ -48,7 +64,7 @@ module.exports = class Prefetcher extends Events {
 
   update() {
     const mUploadedBytes = this.monitor ? this.monitor.stats.upload.bytes : 0
-    const mUploadedBlocks = this.monitor ? this.monitor.stats.upload.blocks: 0
+    const mUploadedBlocks = this.monitor ? this.monitor.stats.upload.blocks : 0
     const mDownloadedBytes = this.monitor ? this.monitor.stats.download.bytes : 0
     const mDownloadedBlocks = this.monitor ? this.monitor.stats.download.blocks : 0
     const mDownloadedBlocksEst = this.mirror ? this.mirror.downloadedBlocksEstimate : 0
@@ -56,7 +72,7 @@ module.exports = class Prefetcher extends Events {
 
     const blocks = mDownloadedBlocks + this._downloadedBlocks
     const est = mDownloadedBlocksEst + this._downloadedBlocksEstimate
-    const progress = this.finished ? 1 : (est === 0 ? 0 : Math.min(0.99, blocks / est))
+    const progress = this.finished ? 1 : est === 0 ? 0 : Math.min(0.99, blocks / est)
 
     this.stats = {
       peers: Math.max(mPeers, this.drive.db.core.peers.length),
@@ -69,24 +85,33 @@ module.exports = class Prefetcher extends Events {
       upload: {
         bytes: mUploadedBytes,
         blocks: mUploadedBlocks,
-        speed: this.mirror ? this.mirror.uploadSpeed() : this._uploadSpeed(),
+        speed: this.mirror ? this.mirror.uploadSpeed() : this._uploadSpeed()
       }
     }
 
     this.emit('update', this.stats)
   }
 
-  async start (mirror) {
+  start(mirror) {
+    if (!this.started) {
+      this.started = this._start(mirror)
+    }
+    return this[Symbol.asyncIterator]()
+  }
+
+  async _start(mirror) {
     this.mirror = mirror
 
-    const [blobs, warmup] = await Promise.all([
-      this.drive.getBlobs(),
-      this.drive.db.get('warmup')
-    ])
+    const [blobs, warmup] = await Promise.all([this.drive.getBlobs(), this.drive.db.get('warmup')])
 
     if (this.mirror) {
       this.monitor = this.mirror.monitor()
-      if (!this.monitor.preloaded) await new Promise(resolve => this.monitor.on('preloaded', resolve))
+      if (!this.monitor.preloaded) {
+        this._startedResolve()
+        await new Promise((resolve) => this.monitor.on('preloaded', resolve))
+      }
+    } else {
+      this._startedResolve()
     }
 
     const ranges = DriveAnalyzer.decode(warmup.value.meta, warmup.value.data)
@@ -131,7 +156,9 @@ module.exports = class Prefetcher extends Events {
       bBlocks = blobs.core.download({ blocks: b.blocks })
     }
 
-    if (this.mirror) await this.mirror.done()
+    if (this.mirror) {
+      await this.mirror.done()
+    }
 
     if (mBlocks) await mBlocks.done()
     if (bBlocks) await bBlocks.done()
