@@ -1,8 +1,8 @@
 const speedometer = require('speedometer')
-const { Readable } = require('bare-stream')
 const DriveAnalyzer = require('drive-analyzer')
+const Events = require('bare-events')
 
-module.exports = class Prefetcher extends Readable {
+module.exports = class Prefetcher extends Events {
   constructor(drive, { interval = 250 } = {}) {
     super()
 
@@ -37,7 +37,11 @@ module.exports = class Prefetcher extends Readable {
 
   async *[Symbol.asyncIterator]() {
     await this._startedPromise
-    if (!this.mirror) return
+    if (!this.mirror) {
+      await this.started
+      return
+    }
+
     yield* this.mirror[Symbol.asyncIterator]()
     await this.started
   }
@@ -89,17 +93,10 @@ module.exports = class Prefetcher extends Readable {
   }
 
   start(mirror) {
-    if (this.started) return
-    this.started = this._start(mirror)
-    return this.started
-  }
-
-  _start(mirror) {
-    const started = this._start(mirror)
-    started.catch((err) => {
-      this.emit('error', err)
-    })
-    return started
+    if (!this.started) {
+      this.started = this._start(mirror)
+    }
+    return this[Symbol.asyncIterator]()
   }
 
   async _start(mirror) {
@@ -110,8 +107,11 @@ module.exports = class Prefetcher extends Readable {
     if (this.mirror) {
       this.monitor = this.mirror.monitor()
       if (!this.monitor.preloaded) {
+        this._startedResolve()
         await new Promise((resolve) => this.monitor.on('preloaded', resolve))
       }
+    } else {
+      this._startedResolve()
     }
 
     const ranges = DriveAnalyzer.decode(warmup.value.meta, warmup.value.data)
@@ -156,7 +156,9 @@ module.exports = class Prefetcher extends Readable {
       bBlocks = blobs.core.download({ blocks: b.blocks })
     }
 
-    if (this.mirror) await this.mirror.done()
+    if (this.mirror) {
+      await this.mirror.done()
+    }
 
     if (mBlocks) await mBlocks.done()
     if (bBlocks) await bBlocks.done()
