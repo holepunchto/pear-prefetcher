@@ -83,9 +83,9 @@ async function assetsenv(t) {
   const remote = new Hyperdrive(store)
   await remote.ready()
 
-  await remote.put('/a', Buffer.allocUnsafe(1024 * 1024))
-  await remote.put('/e', Buffer.allocUnsafe(1024 * 1024))
-  await remote.put('/c', Buffer.allocUnsafe(1024 * 1024))
+  await remote.put('/a', Buffer.alloc(1024 * 1024))
+  await remote.put('/e', Buffer.alloc(1024 * 1024))
+  await remote.put('/c', Buffer.alloc(1024 * 1024))
 
   const local = new Localdrive(await getTmpDir())
   await local.ready()

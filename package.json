@@ -14,7 +14,6 @@
   "author": "",
   "license": "Apache-2.0",
   "dependencies": {
-    "bare-stream": "^2.7.0",
     "drive-analyzer": "^2.0.2"
   },
   "description": "Pear platform run prefetch monitoring",
