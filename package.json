@@ -7,7 +7,8 @@
   ],
   "scripts": {
     "format": "prettier --write . && lunte --fix",
-    "lint": "prettier --check . && lunte"
+    "lint": "prettier --check . && lunte",
+    "test": "bare test/index.test.js"
   },
   "keywords": [],
   "author": "",
@@ -18,8 +19,13 @@
   },
   "description": "Pear platform run prefetch monitoring",
   "devDependencies": {
+    "bare-path": "^3.0.0",
     "brittle": "^3.19.1",
+    "corestore": "^7.7.0",
+    "hyperdrive": "^13.1.3",
+    "localdrive": "^2.2.0",
     "lunte": "^1.5.0",
+    "mirror-drive": "^1.11.1",
     "prettier": "^3.8.1",
     "prettier-config-holepunch": "^2.0.0"
   }
